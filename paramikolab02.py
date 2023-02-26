@@ -1,4 +1,5 @@
 import os
+import threading
 import time
 
 import paramiko
@@ -107,5 +108,12 @@ devices = [
     ])
 ]
 
+threads = list()
+
 for device in devices:
-    device.exec()
+    x = threading.Thread(target=device.exec)
+    threads.append(x)
+    x.start()
+
+for index, thread in enumerate(threads):
+    thread.join()
