@@ -47,7 +47,7 @@ class Device:
             send("terminal length 0")
             for cmd in self.cmds:
                 send(cmd)
-            print(send("sh ip int br", read_output=True))
+            print(send("do sh ip int br", read_output=True))
 
 
 devices = [
