@@ -1,4 +1,5 @@
 import os
+import re
 
 from netmiko import ConnectHandler
 
@@ -122,8 +123,7 @@ def get_data_from_device(device_params, cmd):
 
 def get_ip(device_params, iface):
     data = get_data_from_device(device_params, 'sh ip int br {}'.format(iface))
-    lines = data.strip().split('\n')
-    return lines[1].split()[1]
+    return re.search(r'(\d+.\d+.\d+.\d+|unassigned)', data)[0]
 
 
 def get_subnet(device_params, iface):
@@ -132,21 +132,18 @@ def get_subnet(device_params, iface):
         if len(line) > 0 and line[0] != " ":
             continue
         line = line.strip()
-        if line == "no ip address":
-            return line
-        if "ip address" in line:
-            return line.split()[-1]
+        intf_subnet = re.search(r"(\d+\.\d+\.\d+\.\d+$|dhcp|no ip address)", line)
+        if intf_subnet is not None:
+            intf_subnet = intf_subnet.group(0)
+            return intf_subnet
 
 
 def get_iface_stat(device_params, iface):
     data = get_data_from_device(device_params, "sh int {} description".format(iface))
     lines = data.strip().split('\n')
-    words = lines[1].split()
-    for (idx, w) in enumerate(words):
-        if w in ["down", "admin", "up"]:
-            if w == "admin":
-                return " ".join(words[idx + 3:]), ("%s %s" % (w, words[idx + 1]), words[idx + 2])
-            return " ".join(words[idx + 2:]), (w, words[idx + 1])
+    intf_data = re.search(r"(up|admin down)\s+(up|down)\s+(.+)", lines[1])
+    status, status_proto, desc = intf_data.groups()
+    return desc, (status, status_proto)
 
 
 if __name__ == '__main__':
