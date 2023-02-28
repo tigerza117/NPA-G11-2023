@@ -1,5 +1,6 @@
 import os
-import re
+import socket
+import struct
 
 from netmiko import ConnectHandler
 
@@ -101,7 +102,6 @@ devices_config = {
             "iface_subnet": [
                 ("G0/0", "255.255.255.240"),
                 ("G0/1", "255.255.255.240"),
-                ("G0/2", "dhcp"),
                 ("G0/3", "no ip address"),
             ],
             "iface_description_and_stat": [
@@ -117,33 +117,33 @@ devices_config = {
 
 def get_data_from_device(device_params, cmd):
     with ConnectHandler(**device_params) as ssh:
-        result_cmd = ssh.send_command(cmd)
+        result_cmd = ssh.send_command(cmd, use_textfsm=True)
         return result_cmd
 
 
 def get_ip(device_params, iface):
-    data = get_data_from_device(device_params, 'sh ip int br {}'.format(iface))
-    return re.search(r'(\d+.\d+.\d+.\d+|unassigned)', data)[0]
+    data = get_data_from_device(device_params, 'sh ip int br {}'.format(iface))[0]
+    return data["ipaddr"]
 
 
 def get_subnet(device_params, iface):
-    data = get_data_from_device(device_params, "sh run int {}".format(iface))
-    for line in data.strip().split("\n"):
-        if len(line) > 0 and line[0] != " ":
-            continue
-        line = line.strip()
-        intf_subnet = re.search(r"(\d+\.\d+\.\d+\.\d+$|dhcp|no ip address)", line)
-        if intf_subnet is not None:
-            intf_subnet = intf_subnet.group(0)
-            return intf_subnet
+    data = get_data_from_device(device_params, "sh ip int {}".format(iface))[0]
+    if len(data["ipaddr"]) == 0:
+        return "no ip address"
+
+    return str(cidr_to_netmask(data["mask"][0]))
+
+
+def cidr_to_netmask(net_bits):
+    # credit https://stackoverflow.com/questions/33750233/convert-cidr-to-subnet-mask-in-python
+    host_bits = 32 - int(net_bits)
+    netmask = socket.inet_ntoa(struct.pack('!I', (1 << 32) - (1 << host_bits)))
+    return netmask
 
 
 def get_iface_stat(device_params, iface):
-    data = get_data_from_device(device_params, "sh int {} description".format(iface))
-    lines = data.strip().split('\n')
-    intf_data = re.search(r"(up|admin down)\s+(up|down)\s+(.+)", lines[1])
-    status, status_proto, desc = intf_data.groups()
-    return desc, (status, status_proto)
+    data = get_data_from_device(device_params, "sh int {} description".format(iface))[0]
+    return data["descrip"], (data["status"], data["protocol"])
 
 
 if __name__ == '__main__':
