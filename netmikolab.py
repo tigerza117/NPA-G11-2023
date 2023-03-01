@@ -114,11 +114,16 @@ devices_config = {
     },
 }
 
+ssh_cache = {}
+
 
 def get_data_from_device(device_params, cmd):
-    with ConnectHandler(**device_params) as ssh:
-        result_cmd = ssh.send_command(cmd, use_textfsm=True)
-        return result_cmd
+    ssh = ssh_cache.get(device_params["ip"], None)
+    if ssh is None:
+        ssh = ConnectHandler(**device_params)
+        ssh_cache[device_params["ip"]] = ssh
+    result_cmd = ssh.send_command(cmd, use_textfsm=True)
+    return result_cmd
 
 
 def get_ip(device_params, iface):
