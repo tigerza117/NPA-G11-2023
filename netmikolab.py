@@ -2,6 +2,7 @@ import os
 import socket
 import struct
 
+from jinja2 import Template
 from netmiko import ConnectHandler
 
 params = {
@@ -14,17 +15,26 @@ params = {
 devices_config = {
     "R1": {
         "mgmt_ip": "172.31.111.4",
-        "cmds": [
-            "int G0/0",
-            "description Connect to G0/2 of S0",
-            "int G0/1",
-            "description Connect to G0/2 of S1",
-            "int G0/2",
-            "description Connect to G0/1 of R2",
-            "int G0/3",
-            "description Not Use",
-            "do wr"
-        ],
+        "config": {
+            "descriptions": [
+                {
+                    "interface": "g0/0",
+                    "description": "Connect to G0/2 of S0"
+                },
+                {
+                    "interface": "g0/1",
+                    "description": "Connect to G0/2 of S1"
+                },
+                {
+                    "interface": "g0/2",
+                    "description": "Connect to G0/1 of R2"
+                },
+                {
+                    "interface": "g0/3",
+                    "description": "Not Use"
+                }
+            ],
+        },
         "tests": {
             "iface_ip": [
                 ("G0/0", "172.31.111.4"),
@@ -48,17 +58,26 @@ devices_config = {
     },
     "R2": {
         "mgmt_ip": "172.31.111.5",
-        "cmds": [
-            "int G0/0",
-            "description Connect to G0/3 of S0",
-            "int G0/1",
-            "description Connect to G0/2 of R1",
-            "int G0/2",
-            "description Connect to G0/1 of R3",
-            "int G0/3",
-            "description Not Use",
-            "do wr"
-        ],
+        "config": {
+            "descriptions": [
+                {
+                    "interface": "g0/0",
+                    "description": "Connect to G0/3 of S0"
+                },
+                {
+                    "interface": "g0/1",
+                    "description": "Connect to G0/2 of R1"
+                },
+                {
+                    "interface": "g0/2",
+                    "description": "Connect to G0/1 of R3"
+                },
+                {
+                    "interface": "g0/3",
+                    "description": "Not Use"
+                }
+            ],
+        },
         "tests": {
             "iface_ip": [
                 ("G0/0", "172.31.111.5"),
@@ -82,17 +101,26 @@ devices_config = {
     },
     "R3": {
         "mgmt_ip": "172.31.111.6",
-        "cmds": [
-            "int G0/0",
-            "description Connect to G1/0 of S0",
-            "int G0/1",
-            "description Connect to G0/2 of R2",
-            "int G0/2",
-            "description Connect to WAN",
-            "int G0/3",
-            "description Not Use",
-            "do wr"
-        ],
+        "config": {
+            "descriptions": [
+                {
+                    "interface": "g0/0",
+                    "description": "Connect to G1/0 of S0"
+                },
+                {
+                    "interface": "g0/1",
+                    "description": "Connect to G0/2 of R2"
+                },
+                {
+                    "interface": "g0/2",
+                    "description": "Connect to WAN"
+                },
+                {
+                    "interface": "g0/3",
+                    "description": "Not Use"
+                }
+            ]
+        },
         "tests": {
             "iface_ip": [
                 ("G0/0", "172.31.111.6"),
@@ -154,5 +182,8 @@ def get_iface_stat(device_params, iface):
 if __name__ == '__main__':
     for value in devices_config.values():
         with ConnectHandler(**dict(params, ip=value["mgmt_ip"])) as ssh:
-            result = ssh.send_config_set(value["cmds"])
-            print(result)
+            with open("jj/iface_description_config.jinja2") as file:
+                template = Template(file.read())
+                command = template.render(value["config"]).split("\n")
+                result = ssh.send_config_set(command)
+                print(result)
